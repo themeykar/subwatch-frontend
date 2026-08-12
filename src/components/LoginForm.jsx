@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../api';
+import { apiRequest } from '../utils/api';
+
 
 const LoginForm = () => {
   const navigate = useNavigate();
@@ -55,9 +56,12 @@ const LoginForm = () => {
     setError('');
 
     try {
-      const response = await api.post('/api/auth/login/', {
-        email,
-        password,
+      const response = await apiRequest('/api/auth/login/', {
+        method: 'POST',
+        data: {
+          email,
+          password,
+        },
       });
 
       const { access, refresh } = response.data;
@@ -66,8 +70,8 @@ const LoginForm = () => {
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
       
-      // Redirect to dashboard
-      navigate('/dashboard');
+      // Redirect to dashboard replacing history entry
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {

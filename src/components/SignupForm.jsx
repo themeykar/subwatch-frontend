@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../api';
+import { apiRequest } from '../utils/api';
+
 
 const SignupForm = () => {
   const navigate = useNavigate();
@@ -68,10 +69,13 @@ const SignupForm = () => {
     setError('');
 
     try {
-      await api.post('/api/auth/signup/', {
-        email,
-        password,
-        password_confirmation: passwordConfirmation,
+      await apiRequest('/api/auth/signup/', {
+        method: 'POST',
+        data: {
+          email,
+          password,
+          password_confirmation: passwordConfirmation,
+        },
       });
       setSuccess(true);
       setFormData({ email: '', password: '', passwordConfirmation: '' });

@@ -1,17 +1,11 @@
 import React from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginForm from './components/LoginForm';
 import SignupForm from './components/SignupForm';
+import ProtectedRoute from './components/ProtectedRoute';
+import { isAuthenticated, signout } from './utils/auth';
 
 const DashboardPlaceholder = () => {
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    navigate('/login');
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 px-4 relative overflow-hidden">
       <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none"></div>
@@ -29,7 +23,7 @@ const DashboardPlaceholder = () => {
         </p>
         <div className="pt-4">
           <button
-            onClick={handleLogout}
+            onClick={signout}
             className="w-full flex justify-center py-2.5 px-4 border border-slate-700 text-sm font-semibold rounded-lg text-white bg-slate-800 hover:bg-slate-750 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
           >
             Sign Out
@@ -41,16 +35,21 @@ const DashboardPlaceholder = () => {
 };
 
 function App() {
-  const hasAccessToken = !!localStorage.getItem('access_token');
-
   return (
     <Routes>
       <Route path="/login" element={<LoginForm />} />
       <Route path="/signup" element={<SignupForm />} />
-      <Route path="/dashboard" element={<DashboardPlaceholder />} />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardPlaceholder />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/"
-        element={<Navigate to={hasAccessToken ? "/dashboard" : "/login"} replace />}
+        element={<Navigate to={isAuthenticated() ? "/dashboard" : "/login"} replace />}
       />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
@@ -58,3 +57,4 @@ function App() {
 }
 
 export default App;
+
