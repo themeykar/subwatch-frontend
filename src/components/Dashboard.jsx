@@ -10,6 +10,20 @@ const Dashboard = () => {
     localStorage.getItem('preferred_currency') || '₦'
   );
 
+  // Modal & Form States
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState(null);
+  const [formValues, setFormValues] = useState({
+    name: '',
+    cost: '',
+    billing_cycle: 'monthly',
+    next_renewal_date: '',
+    category: '',
+  });
+  const [formErrors, setFormErrors] = useState({});
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [formApiError, setFormApiError] = useState('');
+
   const fetchSubscriptions = async () => {
     setLoading(true);
     setError('');
@@ -109,6 +123,165 @@ const Dashboard = () => {
     if (!b.next_renewal_date) return -1;
     return new Date(a.next_renewal_date) - new Date(b.next_renewal_date);
   });
+
+  // Modal actions
+  const openAddModal = () => {
+    setEditingSubscription(null);
+    setFormValues({
+      name: '',
+      cost: '',
+      billing_cycle: 'monthly',
+      next_renewal_date: '',
+      category: '',
+    });
+    setFormErrors({});
+    setFormApiError('');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (sub) => {
+    setEditingSubscription(sub);
+    setFormValues({
+      name: sub.name,
+      cost: sub.cost,
+      billing_cycle: sub.billing_cycle,
+      next_renewal_date: sub.next_renewal_date,
+      category: sub.category || '',
+    });
+    setFormErrors({});
+    setFormApiError('');
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormValues((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    // Clear field-specific error as user types
+    if (formErrors[name]) {
+      setFormErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  // Validation function
+  const validateForm = () => {
+    const errors = {};
+    if (!formValues.name || !formValues.name.trim()) {
+      errors.name = 'Name is required and cannot be empty.';
+    }
+    
+    const costNum = parseFloat(formValues.cost);
+    if (!formValues.cost || isNaN(costNum) || costNum <= 0) {
+      errors.cost = 'Cost is required and must be a positive number greater than 0.';
+    }
+
+    if (!formValues.billing_cycle) {
+      errors.billing_cycle = 'Billing cycle selection is required.';
+    }
+
+    if (!formValues.next_renewal_date) {
+      errors.next_renewal_date = 'Next renewal date is required.';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setSubmitLoading(true);
+    setFormApiError('');
+
+    const payload = {
+      name: formValues.name.trim(),
+      cost: parseFloat(formValues.cost),
+      billing_cycle: formValues.billing_cycle,
+      next_renewal_date: formValues.next_renewal_date,
+      category: formValues.category.trim() || '',
+    };
+
+    try {
+      if (editingSubscription) {
+        // PATCH
+        const response = await apiRequest(`/api/subscriptions/${editingSubscription.id}/`, {
+          method: 'PATCH',
+          data: payload,
+        });
+        setSubscriptions((prev) =>
+          prev.map((sub) => (sub.id === editingSubscription.id ? response.data : sub))
+        );
+      } else {
+        // POST
+        const response = await apiRequest('/api/subscriptions/', {
+          method: 'POST',
+          data: payload,
+        });
+        setSubscriptions((prev) => [...prev, response.data]);
+      }
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      if (err.response?.data) {
+        const data = err.response.data;
+        if (typeof data === 'object') {
+          const serverErrors = {};
+          let genericErrorMsg = '';
+          for (const [key, value] of Object.entries(data)) {
+            const displayVal = Array.isArray(value) ? value.join(', ') : value;
+            if (['name', 'cost', 'billing_cycle', 'next_renewal_date', 'category'].includes(key)) {
+              serverErrors[key] = displayVal;
+            } else {
+              genericErrorMsg += `${key}: ${displayVal}\n`;
+            }
+          }
+          if (Object.keys(serverErrors).length > 0) {
+            setFormErrors(serverErrors);
+          }
+          if (genericErrorMsg) {
+            setFormApiError(genericErrorMsg);
+          } else {
+            setFormApiError('Failed to save subscription. Check field errors.');
+          }
+        } else {
+          setFormApiError(data.toString());
+        }
+      } else {
+        setFormApiError(err.message || 'An unexpected error occurred.');
+      }
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleDelete = async (sub) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete ${sub.name}? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await apiRequest(`/api/subscriptions/${sub.id}/`, {
+        method: 'DELETE',
+      });
+      // Remove from state list immediately
+      setSubscriptions((prev) => prev.filter((item) => item.id !== sub.id));
+    } catch (err) {
+      console.error(err);
+      alert(
+        err.response?.data?.detail || 
+        err.message || 
+        'An error occurred while deleting the subscription.'
+      );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col relative overflow-hidden">
@@ -250,6 +423,15 @@ const Dashboard = () => {
                     </span>
                   )}
                 </h2>
+                <button
+                  onClick={openAddModal}
+                  className="inline-flex items-center px-4 py-2 text-sm font-semibold rounded-lg text-slate-950 bg-gradient-to-r from-indigo-400 to-purple-400 hover:from-indigo-300 hover:to-purple-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all shadow-lg shadow-indigo-950/20"
+                >
+                  <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Subscription
+                </button>
               </div>
 
               {/* Empty State */}
@@ -265,6 +447,14 @@ const Dashboard = () => {
                     <p className="mt-2 text-sm text-slate-400">
                       Add your first subscription to track costs, renewal dates, and spend metrics.
                     </p>
+                    <div className="pt-4">
+                      <button
+                        onClick={openAddModal}
+                        className="inline-flex items-center px-4 py-2 text-sm font-semibold rounded-lg text-slate-950 bg-gradient-to-r from-indigo-400 to-purple-400 hover:from-indigo-300 hover:to-purple-300 transition-all focus:outline-none"
+                      >
+                        Add Subscription
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -325,10 +515,36 @@ const Dashboard = () => {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                             <span>Next bill:</span>
+                            <span className="font-semibold text-slate-200 ml-1">
+                              {formatDate(sub.next_renewal_date)}
+                            </span>
                           </div>
-                          <span className="font-semibold text-slate-200">
-                            {formatDate(sub.next_renewal_date)}
-                          </span>
+                          <div className="flex items-center space-x-2 z-20">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(sub);
+                              }}
+                              className="text-slate-400 hover:text-white transition-colors p-1 rounded hover:bg-slate-900 focus:outline-none"
+                              title="Edit Subscription"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(sub);
+                              }}
+                              className="text-slate-400 hover:text-rose-500 transition-colors p-1 rounded hover:bg-slate-900 focus:outline-none"
+                              title="Delete Subscription"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -339,6 +555,165 @@ const Dashboard = () => {
           </>
         )}
       </main>
+
+      {/* Add / Edit Modal Overlay */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white">
+                {editingSubscription ? 'Edit Subscription' : 'Add Subscription'}
+              </h3>
+              <button
+                onClick={closeModal}
+                className="text-slate-400 hover:text-white transition-colors focus:outline-none"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {formApiError && (
+                <div className="rounded-lg bg-red-950/30 border border-red-500/30 p-3 text-xs text-red-400 whitespace-pre-line">
+                  {formApiError}
+                </div>
+              )}
+
+              {/* Name */}
+              <div>
+                <label htmlFor="modal-name" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  Subscription Name *
+                </label>
+                <input
+                  id="modal-name"
+                  type="text"
+                  name="name"
+                  required
+                  value={formValues.name}
+                  onChange={handleInputChange}
+                  placeholder="e.g. Netflix, Spotify"
+                  className="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                />
+                {formErrors.name && (
+                  <p className="mt-1 text-xs text-red-400">{formErrors.name}</p>
+                )}
+              </div>
+
+              {/* Cost & Billing Cycle Group */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="modal-cost" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Cost ({preferredCurrency}) *
+                  </label>
+                  <input
+                    id="modal-cost"
+                    type="number"
+                    name="cost"
+                    step="0.01"
+                    required
+                    value={formValues.cost}
+                    onChange={handleInputChange}
+                    placeholder="0.00"
+                    className="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                  />
+                  {formErrors.cost && (
+                    <p className="mt-1 text-xs text-red-400">{formErrors.cost}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="modal-billing-cycle" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Billing Cycle *
+                  </label>
+                  <select
+                    id="modal-billing-cycle"
+                    name="billing_cycle"
+                    value={formValues.billing_cycle}
+                    onChange={handleInputChange}
+                    className="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                  >
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                  {formErrors.billing_cycle && (
+                    <p className="mt-1 text-xs text-red-400">{formErrors.billing_cycle}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Renewal Date */}
+              <div>
+                <label htmlFor="modal-next-renewal-date" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  Next Renewal Date *
+                </label>
+                <input
+                  id="modal-next-renewal-date"
+                  type="date"
+                  name="next_renewal_date"
+                  required
+                  value={formValues.next_renewal_date}
+                  onChange={handleInputChange}
+                  className="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                />
+                {formErrors.next_renewal_date && (
+                  <p className="mt-1 text-xs text-red-400">{formErrors.next_renewal_date}</p>
+                )}
+              </div>
+
+              {/* Category */}
+              <div>
+                <label htmlFor="modal-category" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  Category (Optional)
+                </label>
+                <input
+                  id="modal-category"
+                  type="text"
+                  name="category"
+                  value={formValues.category}
+                  onChange={handleInputChange}
+                  placeholder="e.g. Entertainment, Work, Utilities"
+                  className="w-full bg-slate-950/50 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                />
+                {formErrors.category && (
+                  <p className="mt-1 text-xs text-red-400">{formErrors.category}</p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-4 border-t border-slate-800 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="px-4 py-2 border border-slate-800 text-slate-300 hover:text-white bg-slate-950/20 hover:bg-slate-950/40 rounded-lg text-sm font-semibold transition-all focus:outline-none"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitLoading}
+                  className="px-5 py-2 rounded-lg text-sm font-semibold text-slate-950 bg-gradient-to-r from-indigo-400 to-purple-400 hover:from-indigo-300 hover:to-purple-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {submitLoading ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-slate-950" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Saving...
+                    </span>
+                  ) : (
+                    'Save'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
