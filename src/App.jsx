@@ -4,7 +4,7 @@ import LoginForm from './components/LoginForm';
 import SignupForm from './components/SignupForm';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './components/Dashboard';
-import { isAuthenticated } from './utils/auth';
+import LandingPage from './components/LandingPage';
 
 function App() {
   return (
@@ -19,11 +19,8 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/"
-        element={<Navigate to={isAuthenticated() ? "/dashboard" : "/login"} replace />}
-      />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
