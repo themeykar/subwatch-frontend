@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { isAuthenticated } from '../utils/auth';
+import subwatchWordmark from '../assets/subwatch-wordmark.png';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -18,15 +19,11 @@ const LandingPage = () => {
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            {/* Elegant SVG Logo */}
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm shadow-indigo-600/20">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold tracking-tight text-slate-900">
-              SubWatch
-            </span>
+            <img
+              src={subwatchWordmark}
+              alt="SubWatch"
+              className="h-11 w-auto"
+            />
           </div>
 
           <div className="flex items-center gap-4 sm:gap-6">
@@ -250,13 +247,12 @@ const LandingPage = () => {
       <footer className="bg-white border-t border-slate-100 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            {/* Footer Logo */}
-            <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <span className="font-bold text-slate-900 tracking-tight">SubWatch</span>
+            <img
+              src={subwatchWordmark}
+              alt="SubWatch"
+              className="h-8 w-auto"
+              loading="lazy"
+            />
           </div>
           <p className="text-sm text-slate-500">
             &copy; 2026 SubWatch. All rights reserved.
